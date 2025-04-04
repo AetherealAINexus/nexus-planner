@@ -1,30 +1,29 @@
-from flask import Flask, request, jsonify
+from fastapi import FastAPI
+from starlette.requests import Request
 import os
+import yaml
 
-app = Flask(__name__)
+app = FastAPI(title="Nexus Comms Core")
 
-@app.route("/plan", methods=["POST"])
-def plan():
-    data = request.get_json(force=True)
-    goal = data.get("goal", "").strip()
+# Load Nucleus Role Config
+def load_config():
+    role = os.getenv("NEXUS_ROLE", "orchestrator")
+    config_path = f"./Config/nucleus/{role}_config.yaml"
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            return yaml.safe_load(f)
+    return {}
 
-    if not goal:
-        return jsonify({"error": "Goal is required"}), 400
+@app.on_event("startup")
+async def startup_event():
+    config = load_config()
+    print(f"[🌐 Booting as {config.get('name', 'Unknown Role')}...]")
 
-    # Very naive placeholder planner
-    steps = [
-        f"Analyze intent: {goal}",
-        f"Search memory for context",
-        f"Apply tone filter to final result",
-        f"Run core-text for final generation"
-    ]
+@app.get("/ping")
+async def ping():
+    return {"message": "🛰️ Hello from Nexus Comms!"}
 
-    return jsonify({"plan": steps})
-
-@app.route("/", methods=["GET"])
-def root():
-    return jsonify({"message": "🧭 Planner node online."})
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+@app.post("/echo")
+async def echo(request: Request):
+    data = await request.json()
+    return {"echo": data}
